@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aegis | Threat Dashboard</title>
+    <!-- Apple-style Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=SF+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            /* Apple Dark Mode Red Palette */
+            --apple-red: #FF453A;
+            --apple-red-light: #FF6961;
+            --apple-green: #32D74B;
+            --apple-orange: #FF9F0A;
+            --text-main: #FFFFFF;
+            --text-muted: rgba(255, 255, 255, 0.6);
+            --glass-bg: rgba(30, 30, 32, 0.4);
+            --glass-panel: rgba(20, 20, 22, 0.5);
+            --glass-border: rgba(255, 255, 255, 0.12);
+            --glass-blur: blur(40px) saturate(180%);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
+
+        body {
+            background: linear-gradient(-45deg, #0a0000, #1c0303, #000000, #260505);
+            background-size: 400% 400%; animation: gradientBG 20s ease infinite;
+            color: var(--text-main); height: 100vh; display: flex; flex-direction: column; overflow: hidden;
+        }
+
+        @keyframes gradientBG { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+
+        .bg-glow {
+            position: fixed; top: -20%; left: 50%; transform: translateX(-50%); width: 80vw; height: 80vh;
+            background: radial-gradient(circle, rgba(255, 69, 58, 0.1) 0%, transparent 60%); z-index: -1; pointer-events: none;
+        }
+
+        /* --- NAVBAR --- */
+        nav {
+            display: flex; justify-content: space-between; align-items: center; padding: 16px 32px;
+            background: rgba(10, 10, 12, 0.6); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+            border-bottom: 1px solid var(--glass-border); z-index: 10;
+        }
+        .logo { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 1.1rem; }
+        .logo-icon { background: linear-gradient(135deg, var(--apple-red), #FF8A65); padding: 4px 8px; border-radius: 8px; font-size: 0.8rem; }
+        .back-link { color: var(--text-muted); text-decoration: none; font-size: 0.9rem; transition: color 0.3s; display: flex; align-items: center; gap: 6px; }
+        .back-link:hover { color: var(--text-main); }
+
+        /* --- MAIN LAYOUT --- */
+        .container { display: flex; flex: 1; padding: 24px; gap: 24px; max-width: 1600px; margin: 0 auto; width: 100%; height: calc(100vh - 65px); }
+
+        /* --- LEFT: CHAT PANE --- */
+        .chat-pane {
+            flex: 1; display: flex; flex-direction: column;
+            background: var(--glass-panel); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+            border: 1px solid var(--glass-border); border-radius: 24px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+        }
+        .chat-history { flex: 1; padding: 28px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; scroll-behavior: smooth; }
+        .chat-bubble { max-width: 75%; padding: 12px 18px; border-radius: 20px; font-size: 0.95rem; line-height: 1.5; animation: fadeIn 0.3s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .ai-msg { align-self: flex-start; background: rgba(255, 255, 255, 0.1); border-bottom-left-radius: 6px; border: 1px solid var(--glass-border); }
+        .user-msg { align-self: flex-end; background: var(--apple-red); color: white; border-bottom-right-radius: 6px; box-shadow: 0 4px 15px rgba(255, 69, 58, 0.2); }
+        .blocked-msg { align-self: flex-start; background: rgba(255, 69, 58, 0.15); border: 1px solid rgba(255, 69, 58, 0.4); color: #FFB3B0; border-bottom-left-radius: 6px; }
+
+        /* Input */
+        .input-area { padding: 18px 24px; background: rgba(0, 0, 0, 0.2); border-top: 1px solid var(--glass-border); display: flex; gap: 12px; }
+        input[type="text"] {
+            flex: 1; padding: 14px 20px; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--glass-border);
+            border-radius: 14px; color: white; font-size: 0.95rem; outline: none; transition: all 0.2s;
+        }
+        input[type="text"]:focus { background: rgba(255, 255, 255, 0.08); border-color: var(--apple-red); box-shadow: 0 0 0 3px rgba(255, 69, 58, 0.2); }
+        button { padding: 0 24px; background: var(--apple-red); color: white; border: none; border-radius: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s; }
+        button:hover { background: var(--apple-red-light); transform: scale(1.02); }
+
+        /* --- RIGHT: DASHBOARD --- */
+        .dashboard-pane { width: 360px; display: flex; flex-direction: column; gap: 20px; overflow-y: auto; }
+        
+        .status-banner {
+            padding: 14px; border-radius: 16px; text-align: center; font-weight: 500; font-size: 0.85rem;
+            background: rgba(50, 215, 75, 0.1); color: var(--apple-green); border: 1px solid rgba(50, 215, 75, 0.3); transition: all 0.3s;
+        }
+        .status-banner.blocked { background: rgba(255, 69, 58, 0.15); color: var(--apple-red-light); border-color: rgba(255, 69, 58, 0.4); }
+
+        .card { background: var(--glass-panel); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); border: 1px solid var(--glass-border); border-radius: 24px; padding: 24px; }
+        .card-title { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); font-weight: 600; margin-bottom: 20px; }
+
+        .gauge-area { text-align: center; }
+        .threat-val { font-size: 3.8rem; font-weight: 300; color: var(--apple-green); line-height: 1; transition: all 0.3s; }
+        .pill-badge { display: inline-block; margin-top: 12px; padding: 6px 14px; background: rgba(255, 255, 255, 0.08); border: 1px solid var(--glass-border); border-radius: 20px; font-size: 0.75rem; color: var(--text-muted); }
+
+        .metric-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .metric-box { background: rgba(0, 0, 0, 0.2); padding: 14px; border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.05); }
+        .metric-label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+        .metric-val { font-family: 'SF Mono', monospace; font-size: 1.2rem; font-weight: 500; margin-top: 6px; }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 10px; }
+    </style>
+</head>
+<body>
+
+    <div class="bg-glow"></div>
+    <canvas id="geoCanvas" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -2; pointer-events: none;"></canvas>
+
+    <nav>
+        <a href="/" class="back-link"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg> Home</a>
+        <div class="logo"><div class="logo-icon">&lt;/&gt;</div> AegisSecurity</div>
+        <div style="width: 70px;"></div> 
+    </nav>
+
+    <div class="container">
+        <div class="chat-pane">
+            <div class="chat-history" id="chatHistory">
+                <div class="chat-bubble ai-msg">Protected by Scikit-Learn real-time threat detection. Submit a prompt to begin.</div>
+            </div>
+            <div class="input-area">
+                <input type="text" id="userInput" placeholder="Inject prompt payload..." onkeydown="if(event.key === 'Enter') sendPrompt()">
+                <button onclick="sendPrompt()">Send</button>
+            </div>
+        </div>
+
+        <div class="dashboard-pane">
+            <div class="status-banner" id="statusBanner">Traffic Allowed</div>
+
+            <div class="card">
+                <div class="card-title">Threat Assessment Score</div>
+                <div class="gauge-area">
+                    <div class="threat-val" id="threatVal">0.0%</div>
+                    <div class="pill-badge" id="clusterBadge">Class: Pending</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">Packet Telemetry</div>
+                <div class="metric-grid">
+                    <div class="metric-box"><div class="metric-label">Word Count</div><div class="metric-val" id="mWords">0</div></div>
+                    <div class="metric-box"><div class="metric-label">Payload Size</div><div class="metric-val" id="mLength">0</div></div>
+                    <div class="metric-box"><div class="metric-label">Spec. Char %</div><div class="metric-val" id="mRatio">0.00</div></div>
+                    <div class="metric-box"><div class="metric-label">Entropy</div><div class="metric-val" id="mEntropy">0.00</div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Geometric Mesh Canvas Animation -->
+    <script>
+        const canvas = document.getElementById('geoCanvas');
+        const ctx = canvas.getContext('2d');
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        const particles = [];
+        const particleCount = 70;
+        const colors = ['#FF453A', '#FF6961', '#D70015'];
+
+        class Particle {
+            constructor() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * canvas.height;
+                this.vx = (Math.random() - 0.5) * 0.8; 
+                this.vy = (Math.random() - 0.5) * 0.8;
+                this.size = Math.random() * 2.5 + 1.5;
+                this.color = colors[Math.floor(Math.random() * colors.length)];
+                this.shape = Math.floor(Math.random() * 3); // 0 = circle, 1 = triangle, 2 = square
+            }
+            
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                if (this.shape === 0) {
+                    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                } else if (this.shape === 1) {
+                    ctx.moveTo(this.x, this.y - this.size);
+                    ctx.lineTo(this.x + this.size, this.y + this.size);
+                    ctx.lineTo(this.x - this.size, this.y + this.size);
+                } else {
+                    ctx.rect(this.x - this.size, this.y - this.size, this.size * 2, this.size * 2);
+                }
+                ctx.closePath();
+                ctx.fill();
+            }
+            
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                
+                if (this.x < 0 || this.x > canvas.width) this.vx *= -1;
+                if (this.y < 0 || this.y > canvas.height) this.vy *= -1;
+            }
+        }
+
+        for (let i = 0; i < particleCount; i++) {
+            particles.push(new Particle());
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            for (let i = 0; i < particles.length; i++) {
+                particles[i].update();
+                particles[i].draw();
+                
+                for (let j = i; j < particles.length; j++) {
+                    const dx = particles[i].x - particles[j].x;
+                    const dy = particles[i].y - particles[j].y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distance < 140) {
+                        ctx.beginPath();
+                        ctx.strokeStyle = `rgba(255, 69, 58, ${0.4 - distance / 350})`;
+                        ctx.lineWidth = 0.8;
+                        ctx.moveTo(particles[i].x, particles[i].y);
+                        ctx.lineTo(particles[j].x, particles[j].y);
+                        ctx.stroke();
+                    }
+                }
+            }
+            requestAnimationFrame(animate);
+        }
+
+        animate();
+    </script>
+
+    <!-- Gateway API Handler Script -->
+    <script>
+        async function sendPrompt() {
+            const input = document.getElementById('userInput');
+            const promptText = input.value.trim();
+            if (!promptText) return;
+
+            const chatHistory = document.getElementById('chatHistory');
+            chatHistory.innerHTML += `<div class="chat-bubble user-msg">${escapeHtml(promptText)}</div>`;
+            input.value = ''; chatHistory.scrollTop = chatHistory.scrollHeight;
+
+            try {
+                const response = await fetch('/ask', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: promptText })
+                });
+                const data = await response.json();
+                
+                if (data.telemetry) {
+                    document.getElementById('mWords').innerText = data.telemetry.word_count;
+                    document.getElementById('mLength').innerText = data.telemetry.prompt_length;
+                    document.getElementById('mRatio').innerText = data.telemetry.special_char_ratio.toFixed(2);
+                    document.getElementById('mEntropy').innerText = data.telemetry.entropy.toFixed(2);
+                    document.getElementById('clusterBadge').innerText = `Archetype: ${data.telemetry.cluster_id.replace('Archetype_', '')}`;
+                    
+                    const tScore = data.telemetry.threat_percentage;
+                    const threatEl = document.getElementById('threatVal');
+                    threatEl.innerText = `${tScore}%`;
+
+                    if (tScore > 50) { threatEl.style.color = 'var(--apple-red-light)'; } 
+                    else if (tScore > 25) { threatEl.style.color = 'var(--apple-orange)'; } 
+                    else { threatEl.style.color = 'var(--apple-green)'; }
+                }
+
+                const statusBanner = document.getElementById('statusBanner');
+                if (data.status === 'blocked') {
+                    statusBanner.innerText = 'Threat Intercepted'; statusBanner.className = 'status-banner blocked';
+                    chatHistory.innerHTML += `<div class="chat-bubble blocked-msg"><strong>Gateway Alert:</strong> ${escapeHtml(data.message)}</div>`;
+                } else {
+                    statusBanner.innerText = 'Traffic Allowed'; statusBanner.className = 'status-banner';
+                    chatHistory.innerHTML += `<div class="chat-bubble ai-msg">${escapeHtml(data.answer).replace(/\n/g, '<br>')}</div>`;
+                }
+            } catch (err) { chatHistory.innerHTML += `<div class="chat-bubble blocked-msg">Network error.</div>`; }
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+        }
+        function escapeHtml(text) { return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+    </script>
+</body>
+</html>

@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aegis | AI Security Firewall</title>
+    <!-- Apple-style Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            /* Apple Dark Mode Red Palette */
+            --apple-red: #FF453A;
+            --apple-red-light: #FF6961;
+            --apple-red-dark: #D70015;
+            --text-main: #FFFFFF;
+            --text-muted: rgba(255, 255, 255, 0.6);
+            --glass-bg: rgba(30, 30, 32, 0.4);
+            --glass-border: rgba(255, 255, 255, 0.12);
+            --glass-blur: blur(40px) saturate(180%);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        html { scroll-behavior: smooth; }
+
+        body {
+            background: linear-gradient(-45deg, #0a0000, #1c0303, #000000, #260505);
+            background-size: 400% 400%;
+            animation: gradientBG 20s ease infinite;
+            color: var(--text-main);
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        /* Ambient Glow */
+        .bg-glow {
+            position: fixed; top: -20%; left: 50%; transform: translateX(-50%);
+            width: 80vw; height: 80vh;
+            background: radial-gradient(circle, rgba(255, 69, 58, 0.12) 0%, transparent 60%);
+            z-index: -1; pointer-events: none;
+        }
+
+        /* --- NAVBAR --- */
+        nav {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 16px 5%; max-width: 1200px; margin: 20px auto;
+            background: rgba(20, 20, 22, 0.6);
+            backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+            border: 1px solid var(--glass-border); border-radius: 100px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            position: relative; z-index: 10;
+        }
+        .logo { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 1.1rem; }
+        .logo-icon {
+            background: linear-gradient(135deg, var(--apple-red), #FF8A65);
+            padding: 4px 8px; border-radius: 8px; font-size: 0.8rem;
+            box-shadow: 0 0 15px rgba(255, 69, 58, 0.4);
+        }
+        .nav-links { display: flex; gap: 28px; }
+        .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 0.9rem; transition: color 0.3s; }
+        .nav-links a:hover { color: var(--text-main); }
+        .nav-cta {
+            background: rgba(255, 255, 255, 0.1); border: 1px solid var(--glass-border);
+            padding: 8px 18px; border-radius: 20px; color: white; text-decoration: none;
+            font-size: 0.85rem; font-weight: 500; transition: all 0.3s;
+        }
+        .nav-cta:hover { background: rgba(255, 255, 255, 0.2); }
+
+        /* --- HERO SECTION --- */
+        .hero { max-width: 900px; margin: 80px auto 60px; text-align: center; padding: 0 20px; }
+        .pill-badge {
+            display: inline-flex; align-items: center; gap: 8px;
+            background: rgba(255, 69, 58, 0.15); border: 1px solid rgba(255, 69, 58, 0.3);
+            padding: 6px 16px; border-radius: 50px; font-size: 0.75rem; font-weight: 500;
+            color: var(--apple-red-light); margin-bottom: 24px;
+        }
+        .hero h1 { font-size: 4rem; font-weight: 700; line-height: 1.15; letter-spacing: -0.03em; margin-bottom: 24px; }
+        .text-gradient {
+            background: linear-gradient(to right, #FF453A, #FF8A65);
+            -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .hero p { font-size: 1.1rem; color: var(--text-muted); line-height: 1.6; max-width: 650px; margin: 0 auto 40px; }
+
+        .btn-group { display: flex; justify-content: center; gap: 16px; }
+        .btn {
+            padding: 14px 28px; border-radius: 100px; font-weight: 500; font-size: 0.95rem;
+            text-decoration: none; transition: all 0.3s; display: inline-flex; align-items: center; gap: 8px;
+        }
+        .btn-primary { background: var(--apple-red); color: white; box-shadow: 0 4px 20px rgba(255, 69, 58, 0.3); }
+        .btn-primary:hover { background: var(--apple-red-light); transform: translateY(-2px); }
+        .btn-secondary { background: var(--glass-bg); color: white; border: 1px solid var(--glass-border); backdrop-filter: var(--glass-blur); }
+        .btn-secondary:hover { background: rgba(255, 255, 255, 0.1); }
+
+        /* --- STATS SECTION --- */
+        .stats-divider {
+            margin-top: 80px; padding: 40px 20px;
+            background: rgba(20, 20, 22, 0.4); backdrop-filter: var(--glass-blur);
+            border-top: 1px solid var(--glass-border); border-bottom: 1px solid var(--glass-border);
+        }
+        .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); max-width: 1000px; margin: 0 auto; text-align: center; }
+        .stat-item { border-right: 1px solid var(--glass-border); }
+        .stat-item:last-child { border-right: none; }
+        .stat-num { font-size: 2.5rem; font-weight: 700; color: var(--apple-red-light); margin-bottom: 4px; }
+        .stat-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); }
+
+        /* --- FEATURES SECTION --- */
+        .features { max-width: 1100px; margin: 100px auto; text-align: center; padding: 0 20px; }
+        .features h2 { font-size: 2.5rem; font-weight: 700; margin: 16px 0; letter-spacing: -0.02em; }
+        .features p { color: var(--text-muted); font-size: 1.05rem; margin-bottom: 50px; }
+        
+        .cards-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+        .card {
+            background: var(--glass-bg); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+            border: 1px solid var(--glass-border); border-radius: 24px; padding: 32px 24px; text-align: left;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        .card:hover { transform: translateY(-5px); box-shadow: 0 20px 40px rgba(0,0,0,0.4); border-color: rgba(255, 69, 58, 0.4); }
+        .card-icon {
+            width: 44px; height: 44px; background: rgba(255, 69, 58, 0.15); border: 1px solid rgba(255, 69, 58, 0.3);
+            border-radius: 12px; display: flex; align-items: center; justify-content: center;
+            margin-bottom: 20px; color: var(--apple-red-light);
+        }
+        .card h3 { font-size: 1.2rem; font-weight: 600; margin-bottom: 10px; }
+        .card p { font-size: 0.9rem; color: var(--text-muted); line-height: 1.5; }
+    </style>
+</head>
+<body>
+
+    <div class="bg-glow"></div>
+    <canvas id="geoCanvas" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -2; pointer-events: none;"></canvas>
+
+    <nav>
+        <div class="logo">
+            <div class="logo-icon">&lt;/&gt;</div>
+            AegisSecurity
+        </div>
+        <div class="nav-links">
+            <a href="#overview">Overview</a>
+            <a href="#architecture">Architecture</a>
+            <a href="#features">Features</a>
+            <a href="https://github.com/" target="_blank" rel="noopener noreferrer">GitHub</a>
+        </div>
+        <a href="/dashboard" class="nav-cta">Launch App</a>
+    </nav>
+
+    <section class="hero" id="overview">
+        <div class="pill-badge">✦ Machine Learning Active</div>
+        <h1>AI Security Firewall <br> Built for <span class="text-gradient">Production LLMs</span></h1>
+        <p>Specializing in Scikit-Learn pipelines, Prompt Injection mitigation, and heuristic analysis. From structural metadata extraction to real-time threat clustering — defending endpoints instantly.</p>
+        
+        <div class="btn-group">
+            <a href="/dashboard" class="btn btn-primary">Launch Dashboard →</a>
+            <a href="#architecture" class="btn btn-secondary">View Architecture</a>
+        </div>
+    </section>
+
+    <div class="stats-divider" id="architecture">
+        <div class="stats-grid">
+            <div class="stat-item"><div class="stat-num">4+</div><div class="stat-label">Metric Features</div></div>
+            <div class="stat-item"><div class="stat-num">3</div><div class="stat-label">ML Algorithms</div></div>
+            <div class="stat-item"><div class="stat-num">&lt;0.1s</div><div class="stat-label">Inference Latency</div></div>
+            <div class="stat-item"><div class="stat-num">100%</div><div class="stat-label">Local Execution</div></div>
+        </div>
+    </div>
+
+    <section class="features" id="features">
+        <div class="pill-badge" style="margin-bottom:0;">PIPELINE ARCHITECTURE</div>
+        <h2>Defenses Built for <span class="text-gradient">Serious Applications</span></h2>
+        <p>Professional-grade middleware — no external APIs, no data leaks. Every packet is evaluated locally.</p>
+
+        <div class="cards-grid">
+            <div class="card">
+                <div class="card-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg></div>
+                <h3>Metadata Extraction</h3>
+                <p>Calculates structural indicators including Shannon Entropy and specific punctuation-to-character density ratios in real time.</p>
+            </div>
+            <div class="card">
+                <div class="card-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg></div>
+                <h3>K-Means Clustering</h3>
+                <p>Unsupervised learning algorithm groups incoming traffic into distinct structural archetypes to identify anomalous payloads.</p>
+            </div>
+            <div class="card">
+                <div class="card-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg></div>
+                <h3>Random Forest Evaluation</h3>
+                <p>Ensemble decision trees calculate an exact threat probability percentage, acting as the final decisive gatekeeper.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Geometric Mesh Canvas Animation -->
+    <script>
+        const canvas = document.getElementById('geoCanvas');
+        const ctx = canvas.getContext('2d');
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        const particles = [];
+        const particleCount = 70;
+        const colors = ['#FF453A', '#FF6961', '#D70015'];
+
+        class Particle {
+            constructor() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * canvas.height;
+                this.vx = (Math.random() - 0.5) * 0.8; 
+                this.vy = (Math.random() - 0.5) * 0.8;
+                this.size = Math.random() * 2.5 + 1.5;
+                this.color = colors[Math.floor(Math.random() * colors.length)];
+                this.shape = Math.floor(Math.random() * 3); // 0 = circle, 1 = triangle, 2 = square
+            }
+            
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                if (this.shape === 0) {
+                    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                } else if (this.shape === 1) {
+                    ctx.moveTo(this.x, this.y - this.size);
+                    ctx.lineTo(this.x + this.size, this.y + this.size);
+                    ctx.lineTo(this.x - this.size, this.y + this.size);
+                } else {
+                    ctx.rect(this.x - this.size, this.y - this.size, this.size * 2, this.size * 2);
+                }
+                ctx.closePath();
+                ctx.fill();
+            }
+            
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                
+                if (this.x < 0 || this.x > canvas.width) this.vx *= -1;
+                if (this.y < 0 || this.y > canvas.height) this.vy *= -1;
+            }
+        }
+
+        for (let i = 0; i < particleCount; i++) {
+            particles.push(new Particle());
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            for (let i = 0; i < particles.length; i++) {
+                particles[i].update();
+                particles[i].draw();
+                
+                for (let j = i; j < particles.length; j++) {
+                    const dx = particles[i].x - particles[j].x;
+                    const dy = particles[i].y - particles[j].y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distance < 140) {
+                        ctx.beginPath();
+                        ctx.strokeStyle = `rgba(255, 69, 58, ${0.4 - distance / 350})`;
+                        ctx.lineWidth = 0.8;
+                        ctx.moveTo(particles[i].x, particles[i].y);
+                        ctx.lineTo(particles[j].x, particles[j].y);
+                        ctx.stroke();
+                    }
+                }
+            }
+            requestAnimationFrame(animate);
+        }
+
+        animate();
+    </script>
+</body>
+</html>

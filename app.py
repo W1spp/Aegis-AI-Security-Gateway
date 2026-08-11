@@ -1,0 +1,143 @@
+import os
+import string
+import math
+import re
+from collections import Counter
+import pandas as pd
+import numpy as np
+import joblib
+from flask import Flask, request, jsonify, render_template
+from huggingface_hub import InferenceClient
+
+app = Flask(__name__)
+
+# --- 1. LOAD TRAINED MODELS & HF CLIENT ---
+print("📥 Loading trained model files...")
+scaler = joblib.load('scaler.pkl')
+kmeans = joblib.load('kmeans.pkl')
+firewall_model = joblib.load('firewall_model.pkl')
+
+# Your specific Hugging Face Token (Loaded securely from the server)
+HF_TOKEN = os.environ.get("HF_TOKEN")
+hf_client = InferenceClient(token=HF_TOKEN)
+
+# --- 2. FEATURE EXTRACTION FUNCTIONS ---
+def special_char_ratio(text):
+    text = str(text)
+    if len(text) == 0: return 0
+    special_chars = [char for char in text if char in string.punctuation]
+    return len(special_chars) / len(text)
+
+def calculate_entropy(text):
+    text = str(text)
+    if len(text) == 0: return 0
+    probabilities = [n_x / len(text) for x, n_x in Counter(text).items()]
+    return -sum(p * math.log2(p) for p in probabilities)
+
+def is_likely_code(text):
+    """Checks if the input is likely just benign programming code."""
+    # Check for Markdown code blocks (e.g., ```html ... ```)
+    if re.search(r'```.*?```', text, re.DOTALL):
+        return True
+    
+    # Check for standard HTML/XML tags (e.g., <html>, <div>, <p>)
+    if re.search(r'<\s*[a-zA-Z1-6]+[^>]*>', text):
+        return True
+    
+    # Check for heavy curly brace usage common in CSS/JSON/C++
+    if text.count('{') > 1 and text.count('}') > 1:
+        return True
+        
+    return False
+
+# --- 3. ROUTES ---
+@app.route('/')
+def home():
+    # Serves the new landing page
+    return render_template('index.html')
+
+@app.route('/dashboard')
+def dashboard():
+    # Serves the main firewall application
+    return render_template('dashboard.html')
+
+@app.route('/ask', methods=['POST'])
+def ask_ai():
+    data = request.json or {}
+    user_prompt = data.get('prompt', '')
+    
+    if not user_prompt.strip():
+        return jsonify({"status": "error", "message": "Empty prompt provided."}), 400
+
+    # A. Calculate real-time features from the incoming string
+    word_cnt = len(user_prompt.split())
+    prompt_len = len(user_prompt)
+    spec_ratio = special_char_ratio(user_prompt)
+    ent_score = calculate_entropy(user_prompt)
+    
+    # B. Format into DataFrame for Scikit-Learn
+    features_df = pd.DataFrame([{
+        'word_count': word_cnt,
+        'prompt_length': prompt_len,
+        'special_char_ratio': spec_ratio,
+        'entropy': ent_score
+    }])
+    
+    # C. Run through the Scikit-Learn Pipeline
+    scaled_features = scaler.transform(features_df)
+    cluster_id = int(kmeans.predict(scaled_features)[0])
+    
+    # Combine scaled features + cluster ID
+    enriched_features = np.column_stack((scaled_features, [cluster_id]))
+    
+    # Predict threat probability (Class 1 = Malicious)
+    threat_prob = float(firewall_model.predict_proba(enriched_features)[0][1])
+    
+    # --- HYBRID OVERRIDE LOGIC ---
+    # If the system detects it's likely just code, cut the threat score by 60%
+    if is_likely_code(user_prompt):
+        threat_prob = threat_prob * 0.40  
+        
+    threat_percentage = round(threat_prob * 100, 1)
+
+    # Telemetry metrics dictionary to return to frontend
+    telemetry = {
+        "word_count": word_cnt,
+        "prompt_length": prompt_len,
+        "special_char_ratio": round(spec_ratio, 3),
+        "entropy": round(ent_score, 2),
+        "cluster_id": f"Archetype_{cluster_id}",
+        "threat_percentage": threat_percentage
+    }
+
+    # D. Decision Gate
+    if threat_prob > 0.50:
+        # THREAT DETECTED: Block and return metrics without calling HF
+        return jsonify({
+            "status": "blocked",
+            "telemetry": telemetry,
+            "message": "⚠️ SECURITY ALERT: Malicious Prompt Injection Pattern Detected!"
+        })
+    else:
+        # SAFE PROMPT: Call Hugging Face API for real answer
+        try:
+            messages = [{"role": "user", "content": user_prompt}]
+            hf_response = hf_client.chat_completion(
+                # Swapped to an open, ungated model guaranteed to work instantly
+                model="Qwen/Qwen2.5-7B-Instruct",
+                messages=messages,
+                max_tokens=400
+            )
+            ai_answer = hf_response.choices[0].message.content
+        except Exception as e:
+            ai_answer = f"Error connecting to AI model: {str(e)}"
+
+        return jsonify({
+            "status": "allowed",
+            "telemetry": telemetry,
+            "answer": ai_answer
+        })
+
+if __name__ == '__main__':
+    print("🚀 Starting Firewall Web Server at http://127.0.0.1:5000")
+    app.run(debug=True)
