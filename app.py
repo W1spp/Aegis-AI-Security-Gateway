@@ -95,7 +95,7 @@ def ask_ai():
     }
 
     # D. Decision Gate
-    if threat_prob > 0.50:
+    if threat_prob > 0.35:
         # THREAT DETECTED: Block and return metrics without calling HF
         return jsonify({
             "status": "blocked",
