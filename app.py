@@ -1,7 +1,6 @@
 import os
 import string
 import math
-import re
 from collections import Counter
 import pandas as pd
 import numpy as np
@@ -35,22 +34,6 @@ def calculate_entropy(text):
     if len(text) == 0: return 0
     probabilities = [n_x / len(text) for x, n_x in Counter(text).items()]
     return -sum(p * math.log2(p) for p in probabilities)
-
-def is_likely_code(text):
-    """Checks if the input is likely just benign programming code."""
-    # Check for Markdown code blocks (e.g., ```html ... ```)
-    if re.search(r'```.*?```', text, re.DOTALL):
-        return True
-    
-    # Check for standard HTML/XML tags (e.g., <html>, <div>, <p>)
-    if re.search(r'<\s*[a-zA-Z1-6]+[^>]*>', text):
-        return True
-    
-    # Check for heavy curly brace usage common in CSS/JSON/C++
-    if text.count('{') > 1 and text.count('}') > 1:
-        return True
-        
-    return False
 
 # --- 3. ROUTES ---
 @app.route('/')
@@ -98,11 +81,6 @@ def ask_ai():
     
     # 4. Predict threat probability (Class 1 = Malicious)
     threat_prob = float(firewall_model.predict_proba(final_features)[0][1])
-    
-    # --- HYBRID OVERRIDE LOGIC ---
-    # If the system detects it's likely just code, cut the threat score by 60%
-    if is_likely_code(user_prompt):
-        threat_prob = threat_prob * 0.40  
         
     threat_percentage = round(threat_prob * 100, 1)
 
