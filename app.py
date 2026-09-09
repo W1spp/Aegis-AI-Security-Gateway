@@ -100,16 +100,16 @@ def ask_ai():
     else:
         # SAFE PROMPT: Route to native free HF inference endpoint
         try:
-            api_url = "https://router.huggingface.co/v1/chat/completions"
+            api_url = "https://router.huggingface.co/hf-inference/v1/chat/completions"
             headers = {
                 "Authorization": f"Bearer {HF_TOKEN}",
                 "Content-Type": "application/json"
             }
             
             payload = {
-                "model": "hf-inference/meta-llama/Llama-3.2-1B-Instruct",
+                "model": "meta-llama/Llama-3.2-1B-Instruct",
                 "messages": [
-                    {"role": "system", "content": "You are a helpful, clear, and direct AI assistant."},
+                    {"role": "system", "content": "You are a helpful and concise AI assistant."},
                     {"role": "user", "content": user_prompt}
                 ],
                 "max_tokens": 250,
@@ -122,7 +122,7 @@ def ask_ai():
             if "choices" in result and len(result["choices"]) > 0:
                 ai_answer = result["choices"][0]["message"]["content"].strip()
             elif "error" in result:
-                ai_answer = f"Model status: {result['error']}"
+                ai_answer = f"Model notice: {result['error']}"
             else:
                 ai_answer = str(result)
 
