@@ -107,9 +107,9 @@ def ask_ai():
         try:
             messages = [{"role": "user", "content": user_prompt}]
             hf_response = hf_client.chat_completion(
-                model="HuggingFaceH4/zephyr-7b-beta",
+                model="mistralai/Mistral-7B-Instruct-v0.3",
                 messages=messages,
-                max_tokens=400
+                max_tokens=300
             )
             ai_answer = hf_response.choices[0].message.content
         except Exception as e:
