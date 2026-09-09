@@ -7,10 +7,49 @@ import joblib
 
 from collections import Counter
 from flask import Flask, request, jsonify, render_template
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from werkzeug.middleware.proxy_fix import ProxyFix
 from scipy.sparse import hstack
 
 
 app = Flask(__name__)
+
+# Render sits behind a reverse proxy.
+# This allows Flask to correctly identify the original client IP.
+app.wsgi_app = ProxyFix(
+    app.wsgi_app,
+    x_for=1,
+    x_proto=1
+)
+
+
+# ============================================================
+# RATE LIMITER
+# ============================================================
+
+limiter = Limiter(
+    key_func=get_remote_address,
+    app=app,
+    default_limits=[]
+)
+
+
+# ============================================================
+# RATE LIMIT ERROR
+# ============================================================
+
+@app.errorhandler(429)
+def ratelimit_handler(e):
+
+    return jsonify({
+        "status": "rate_limited",
+        "message": (
+            "Too many requests. "
+            "Maximum 5 requests per 10 minutes "
+            "from a single IP address."
+        )
+    }), 429
 
 
 # ============================================================
@@ -35,13 +74,15 @@ if not HF_TOKEN:
 # ============================================================
 
 def special_char_ratio(text):
+
     text = str(text)
 
     if len(text) == 0:
         return 0
 
     special_chars = [
-        char for char in text
+        char
+        for char in text
         if char in string.punctuation
     ]
 
@@ -49,6 +90,7 @@ def special_char_ratio(text):
 
 
 def calculate_entropy(text):
+
     text = str(text)
 
     if len(text) == 0:
@@ -71,11 +113,13 @@ def calculate_entropy(text):
 
 @app.route("/")
 def home():
+
     return render_template("index.html")
 
 
 @app.route("/dashboard")
 def dashboard():
+
     return render_template("dashboard.html")
 
 
@@ -84,6 +128,7 @@ def dashboard():
 # ============================================================
 
 @app.route("/ask", methods=["POST"])
+@limiter.limit("5 per 10 minutes")
 def ask_ai():
 
     data = request.json or {}
@@ -91,6 +136,7 @@ def ask_ai():
     user_prompt = data.get("prompt", "")
 
     if not user_prompt.strip():
+
         return jsonify({
             "status": "error",
             "message": "Empty prompt provided."
@@ -102,15 +148,24 @@ def ask_ai():
     # --------------------------------------------------------
 
     word_cnt = len(user_prompt.split())
+
     prompt_len = len(user_prompt)
+
     spec_ratio = special_char_ratio(user_prompt)
+
     ent_score = calculate_entropy(user_prompt)
 
+
     features_df = pd.DataFrame([{
+
         "word_count": word_cnt,
+
         "prompt_length": prompt_len,
+
         "special_char_ratio": spec_ratio,
+
         "entropy": ent_score
+
     }])
 
 
@@ -118,18 +173,28 @@ def ask_ai():
     # B. Run through Scikit-Learn pipeline
     # --------------------------------------------------------
 
-    scaled_features = scaler.transform(features_df)
-
-    cluster_id = int(
-        kmeans.predict(scaled_features)[0]
+    scaled_features = scaler.transform(
+        features_df
     )
 
-    text_features = tfidf.transform([user_prompt])
+    cluster_id = int(
+        kmeans.predict(
+            scaled_features
+        )[0]
+    )
+
+    text_features = tfidf.transform(
+        [user_prompt]
+    )
 
     final_features = hstack([
+
         scaled_features,
+
         [[cluster_id]],
+
         text_features
+
     ])
 
 
@@ -139,15 +204,17 @@ def ask_ai():
     # --------------------------------------------------------
 
     threat_prob = float(
-        firewall_model.predict_proba(final_features)[0][1]
+        firewall_model
+        .predict_proba(final_features)[0][1]
     )
 
 
     # --------------------------------------------------------
-    # Deterministic whitelist for common safe prompts
+    # Safe greetings
     # --------------------------------------------------------
 
     safe_greetings = [
+
         "hi",
         "hello",
         "hey",
@@ -159,9 +226,12 @@ def ask_ai():
         "howdy",
         "good morning",
         "yes"
+
     ]
 
+
     if user_prompt.strip().lower() in safe_greetings:
+
         threat_prob = 0.01
 
 
@@ -176,28 +246,50 @@ def ask_ai():
     # --------------------------------------------------------
 
     telemetry = {
+
         "word_count": word_cnt,
+
         "prompt_length": prompt_len,
-        "special_char_ratio": round(spec_ratio, 3),
-        "entropy": round(ent_score, 2),
-        "cluster_id": f"Archetype_{cluster_id}",
-        "threat_percentage": threat_percentage
+
+        "special_char_ratio": round(
+            spec_ratio,
+            3
+        ),
+
+        "entropy": round(
+            ent_score,
+            2
+        ),
+
+        "cluster_id": (
+            f"Archetype_{cluster_id}"
+        ),
+
+        "threat_percentage": (
+            threat_percentage
+        )
+
     }
 
 
-    # --------------------------------------------------------
+    # ========================================================
     # D. SECURITY DECISION GATE
-    # --------------------------------------------------------
+    # ========================================================
 
     if threat_prob > 0.40:
 
         return jsonify({
+
             "status": "blocked",
+
             "telemetry": telemetry,
+
             "message": (
                 "⚠️ SECURITY ALERT: "
-                "Malicious Prompt Injection Pattern Detected!"
+                "Malicious Prompt Injection "
+                "Pattern Detected!"
             )
+
         })
 
 
@@ -210,15 +302,19 @@ def ask_ai():
         if not HF_TOKEN:
 
             return jsonify({
+
                 "status": "error",
+
                 "telemetry": telemetry,
+
                 "message": (
-                    "HF_TOKEN is not configured on the server."
+                    "HF_TOKEN is not configured "
+                    "on the server."
                 )
+
             }), 500
 
 
-        # Current Hugging Face OpenAI-compatible router
         api_url = (
             "https://router.huggingface.co/"
             "v1/chat/completions"
@@ -226,15 +322,20 @@ def ask_ai():
 
 
         headers = {
-            "Authorization": f"Bearer {HF_TOKEN}",
-            "Content-Type": "application/json"
+
+            "Authorization": (
+                f"Bearer {HF_TOKEN}"
+            ),
+
+            "Content-Type": (
+                "application/json"
+            )
+
         }
 
 
         payload = {
 
-            # Explicitly use Featherless AI because this
-            # model is currently served there through HF.
             "model": (
                 "meta-llama/"
                 "Llama-3.2-1B-Instruct:"
@@ -245,50 +346,70 @@ def ask_ai():
 
                 {
                     "role": "system",
+
                     "content": (
-                        "You are a helpful and concise "
-                        "AI assistant."
+                        "You are a helpful and "
+                        "concise AI assistant."
                     )
+
                 },
 
                 {
                     "role": "user",
+
                     "content": user_prompt
+
                 }
 
             ],
 
             "max_tokens": 250,
+
             "temperature": 0.7,
 
             "stream": False
+
         }
 
 
-        # ----------------------------------------------------
-        # Send request to Hugging Face
-        # ----------------------------------------------------
-
         response = requests.post(
+
             api_url,
+
             headers=headers,
+
             json=payload,
+
             timeout=30
+
         )
 
 
-        # Try to decode JSON
+        # ----------------------------------------------------
+        # Parse response
+        # ----------------------------------------------------
+
         try:
+
             result = response.json()
+
         except ValueError:
 
             return jsonify({
+
                 "status": "error",
+
                 "telemetry": telemetry,
+
                 "message": (
-                    "Hugging Face returned a non-JSON response."
+                    "Hugging Face returned "
+                    "a non-JSON response."
                 ),
-                "http_status": response.status_code
+
+                "http_status": (
+                    response.status_code
+                )
+
             }), 502
 
 
@@ -297,9 +418,13 @@ def ask_ai():
         # ----------------------------------------------------
 
         if (
+
             response.ok
+
             and "choices" in result
+
             and len(result["choices"]) > 0
+
         ):
 
             message = result["choices"][0].get(
@@ -314,30 +439,44 @@ def ask_ai():
 
 
             if not ai_answer:
+
                 ai_answer = (
-                    "The model returned an empty response."
+                    "The model returned "
+                    "an empty response."
                 )
 
 
         # ----------------------------------------------------
-        # Hugging Face API error
+        # Hugging Face error
         # ----------------------------------------------------
 
         elif "error" in result:
 
             error_info = result["error"]
 
-            if isinstance(error_info, dict):
-                error_message = error_info.get(
-                    "message",
-                    str(error_info)
+
+            if isinstance(
+                error_info,
+                dict
+            ):
+
+                error_message = (
+                    error_info.get(
+                        "message",
+                        str(error_info)
+                    )
                 )
+
             else:
-                error_message = str(error_info)
+
+                error_message = str(
+                    error_info
+                )
 
 
             ai_answer = (
-                f"Model notice: {error_message}"
+                f"Model notice: "
+                f"{error_message}"
             )
 
 
@@ -351,7 +490,7 @@ def ask_ai():
 
 
         # ----------------------------------------------------
-        # Return gateway response
+        # Return response
         # ----------------------------------------------------
 
         return jsonify({
@@ -366,7 +505,7 @@ def ask_ai():
 
 
     # ========================================================
-    # F. UPSTREAM CONNECTION ERROR
+    # F. CONNECTION ERRORS
     # ========================================================
 
     except requests.exceptions.Timeout:
@@ -378,8 +517,9 @@ def ask_ai():
             "telemetry": telemetry,
 
             "message": (
-                "Gateway passed prompt, but the "
-                "Hugging Face request timed out."
+                "Gateway passed prompt, "
+                "but the Hugging Face request "
+                "timed out."
             )
 
         }), 504
@@ -394,8 +534,9 @@ def ask_ai():
             "telemetry": telemetry,
 
             "message": (
-                "Gateway passed prompt, but the "
-                f"upstream connection failed: {str(e)}"
+                "Gateway passed prompt, "
+                "but the upstream connection "
+                f"failed: {str(e)}"
             )
 
         }), 502
@@ -427,7 +568,16 @@ if __name__ == "__main__":
     )
 
     app.run(
+
         host="0.0.0.0",
-        port=int(os.environ.get("PORT", 5000)),
+
+        port=int(
+            os.environ.get(
+                "PORT",
+                5000
+            )
+        ),
+
         debug=False
+
     )
