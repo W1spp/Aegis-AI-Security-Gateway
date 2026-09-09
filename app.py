@@ -98,32 +98,35 @@ def ask_ai():
             "message": "⚠️ SECURITY ALERT: Malicious Prompt Injection Pattern Detected!"
         })
     else:
-        # SAFE PROMPT: Direct call to Hugging Face Free Inference API
+        # SAFE PROMPT: Call Hugging Face Router API
         try:
-            api_url = "https://api-inference.huggingface.co/models/Qwen/Qwen2.5-7B-Instruct"
-            headers = {"Authorization": f"Bearer {HF_TOKEN}"}
+            api_url = "https://router.huggingface.co/v1/chat/completions"
+            headers = {
+                "Authorization": f"Bearer {HF_TOKEN}",
+                "Content-Type": "application/json"
+            }
             
             payload = {
-                "inputs": user_prompt,
-                "parameters": {
-                    "max_new_tokens": 200,
-                    "temperature": 0.7,
-                    "return_full_text": False
-                }
+                "model": "Qwen/Qwen2.5-7B-Instruct",
+                "messages": [
+                    {"role": "user", "content": user_prompt}
+                ],
+                "max_tokens": 250,
+                "temperature": 0.7
             }
             
             response = requests.post(api_url, headers=headers, json=payload, timeout=15)
             result = response.json()
 
-            if isinstance(result, dict) and "error" in result:
+            if "choices" in result and len(result["choices"]) > 0:
+                ai_answer = result["choices"][0]["message"]["content"].strip()
+            elif "error" in result:
                 ai_answer = f"Model status: {result['error']}"
-            elif isinstance(result, list) and len(result) > 0:
-                ai_answer = result[0].get("generated_text", "").strip()
             else:
                 ai_answer = str(result)
 
         except Exception as e:
-            ai_answer = f"Gateway passed prompt, but upstream connection timed out: {str(e)}"
+            ai_answer = f"Gateway passed prompt, but upstream connection failed: {str(e)}"
 
         return jsonify({
             "status": "allowed",
