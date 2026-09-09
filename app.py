@@ -105,16 +105,26 @@ def ask_ai():
     else:
         # SAFE PROMPT: Call Hugging Face API for real answer
         try:
+            # google/gemma-2-2b-it is officially hosted directly on HF's free serverless tier
             messages = [{"role": "user", "content": user_prompt}]
             hf_response = hf_client.chat_completion(
-                model="mistralai/Mistral-7B-Instruct-v0.3",
+                model="google/gemma-2-2b-it",
                 messages=messages,
-                max_tokens=300
+                max_tokens=250
             )
             ai_answer = hf_response.choices[0].message.content
         except Exception as e:
-            ai_answer = f"Error connecting to AI model: {str(e)}"
-
+            try:
+                # Fallback: simple text generation if chat router denies the pipeline
+                fallback_resp = hf_client.text_generation(
+                    user_prompt,
+                    model="google/gemma-2-2b-it",
+                    max_new_tokens=150
+                )
+                ai_answer = fallback_resp
+            except Exception as inner_err:
+                ai_answer = f"AI Service Notice: Gateway verified prompt as safe (Threat: {threat_percentage}%), but HF endpoint returned: {str(inner_err)}"
+                
         return jsonify({
             "status": "allowed",
             "telemetry": telemetry,
