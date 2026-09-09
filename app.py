@@ -107,8 +107,7 @@ def ask_ai():
         try:
             messages = [{"role": "user", "content": user_prompt}]
             hf_response = hf_client.chat_completion(
-                # Swapped to an open, ungated model guaranteed to work instantly
-                model="Qwen/Qwen2.5-7B-Instruct",
+                model="HuggingFaceH4/zephyr-7b-beta",
                 messages=messages,
                 max_tokens=400
             )
