@@ -1,17 +1,17 @@
 import os
 import string
 import math
+import requests
 from collections import Counter
 import pandas as pd
 import numpy as np
 import joblib
 from flask import Flask, request, jsonify, render_template
-from huggingface_hub import InferenceClient
 from scipy.sparse import hstack
 
 app = Flask(__name__)
 
-# --- 1. LOAD TRAINED MODELS & HF CLIENT ---
+# --- 1. LOAD TRAINED MODELS & CONFIG ---
 print("📥 Loading trained model files...")
 scaler = joblib.load('scaler.pkl')
 kmeans = joblib.load('kmeans.pkl')
@@ -19,19 +19,19 @@ firewall_model = joblib.load('firewall_model.pkl')
 tfidf = joblib.load('tfidf.pkl')
 
 HF_TOKEN = os.environ.get("HF_TOKEN")
-# Standard client initialization using your Hugging Face token
-hf_client = InferenceClient(token=HF_TOKEN)
 
 # --- 2. FEATURE EXTRACTION FUNCTIONS ---
 def special_char_ratio(text):
     text = str(text)
-    if len(text) == 0: return 0
+    if len(text) == 0:
+        return 0
     special_chars = [char for char in text if char in string.punctuation]
     return len(special_chars) / len(text)
 
 def calculate_entropy(text):
     text = str(text)
-    if len(text) == 0: return 0
+    if len(text) == 0:
+        return 0
     probabilities = [n_x / len(text) for x, n_x in Counter(text).items()]
     return -sum(p * math.log2(p) for p in probabilities)
 
@@ -65,19 +65,19 @@ def ask_ai():
         'entropy': ent_score
     }])
     
-    # B. Run pipeline
+    # B. Run through Scikit-Learn Pipeline
     scaled_features = scaler.transform(features_df)
     cluster_id = int(kmeans.predict(scaled_features)[0])
     text_features = tfidf.transform([user_prompt])
     final_features = hstack([scaled_features, [[cluster_id]], text_features])
     
-    # C. Predict Threat
+    # C. Predict Threat Probability (Class 1 = Malicious)
     threat_prob = float(firewall_model.predict_proba(final_features)[0][1])
     
-    # Greetings Whitelist Override
+    # Deterministic Whitelist for common greetings & safe one-liners
     safe_greetings = ["hi", "hello", "hey", "hlo", "he", "test", "yo", "sup", "howdy", "good morning", "yes"]
     if user_prompt.strip().lower() in safe_greetings:
-        threat_prob = 0.01  # Safe 1%
+        threat_prob = 0.01  # Force 1.0% safe score
         
     threat_percentage = round(threat_prob * 100, 1)
 
@@ -98,26 +98,32 @@ def ask_ai():
             "message": "⚠️ SECURITY ALERT: Malicious Prompt Injection Pattern Detected!"
         })
     else:
-        # SAFE PROMPT: Real conversational response via Hugging Face
+        # SAFE PROMPT: Direct call to Hugging Face Free Inference API
         try:
-            messages = [{"role": "user", "content": user_prompt}]
+            api_url = "https://api-inference.huggingface.co/models/Qwen/Qwen2.5-7B-Instruct"
+            headers = {"Authorization": f"Bearer {HF_TOKEN}"}
             
-            # Use official chat_completion method on an active free-tier chat model
-            hf_response = hf_client.chat_completion(
-                model="meta-llama/Llama-3.2-1B-Instruct",
-                messages=messages,
-                max_tokens=250
-            )
-            ai_answer = hf_response.choices[0].message.content
-        except Exception as e:
-            # Fallback to simple conversational knowledge if API fails
-            lower_p = user_prompt.lower()
-            if "capital of france" in lower_p:
-                ai_answer = "The capital of France is Paris."
-            elif any(w in lower_p for w in ["hi", "hello", "hey", "good morning"]):
-                ai_answer = "Good morning! How can I help you today?"
+            payload = {
+                "inputs": user_prompt,
+                "parameters": {
+                    "max_new_tokens": 200,
+                    "temperature": 0.7,
+                    "return_full_text": False
+                }
+            }
+            
+            response = requests.post(api_url, headers=headers, json=payload, timeout=15)
+            result = response.json()
+
+            if isinstance(result, dict) and "error" in result:
+                ai_answer = f"Model status: {result['error']}"
+            elif isinstance(result, list) and len(result) > 0:
+                ai_answer = result[0].get("generated_text", "").strip()
             else:
-                ai_answer = f"AI Service response for '{user_prompt}': Processed successfully."
+                ai_answer = str(result)
+
+        except Exception as e:
+            ai_answer = f"Gateway passed prompt, but upstream connection timed out: {str(e)}"
 
         return jsonify({
             "status": "allowed",
