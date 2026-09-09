@@ -98,7 +98,7 @@ def ask_ai():
             "message": "⚠️ SECURITY ALERT: Malicious Prompt Injection Pattern Detected!"
         })
     else:
-        # SAFE PROMPT: Call Hugging Face Router API
+        # SAFE PROMPT: Route to native free HF inference endpoint
         try:
             api_url = "https://router.huggingface.co/v1/chat/completions"
             headers = {
@@ -107,15 +107,16 @@ def ask_ai():
             }
             
             payload = {
-                "model": "Qwen/Qwen2.5-7B-Instruct",
+                "model": "hf-inference/meta-llama/Llama-3.2-1B-Instruct",
                 "messages": [
+                    {"role": "system", "content": "You are a helpful, clear, and direct AI assistant."},
                     {"role": "user", "content": user_prompt}
                 ],
                 "max_tokens": 250,
                 "temperature": 0.7
             }
             
-            response = requests.post(api_url, headers=headers, json=payload, timeout=15)
+            response = requests.post(api_url, headers=headers, json=payload, timeout=20)
             result = response.json()
 
             if "choices" in result and len(result["choices"]) > 0:
